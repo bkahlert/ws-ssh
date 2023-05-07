@@ -3,9 +3,8 @@
 const fs = require('fs');
 const path = require('path');
 const merger = require('json-merger');
-const debugWebSSH2 = require('debug')('WebSSH2');
+const debugWebSSH2 = require('debug')('ws-ssh');
 const crypto = require('crypto');
-const util = require('util');
 const readconfig = require('read-config-ng');
 
 const nodeRoot = path.dirname(require.main.filename);
@@ -25,7 +24,7 @@ const configDefault = {
   },
   express: {
     secret: crypto.randomBytes(20).toString('hex'),
-    name: 'WebSSH2',
+    name: 'ws-ssh',
     resave: true,
     saveUninitialized: false,
     unset: 'destroy',
@@ -55,16 +54,6 @@ const configDefault = {
     keepaliveInterval: 120000,
     keepaliveCountMax: 10,
     allowedSubnets: [],
-  },
-  terminal: {
-    cursorBlink: true,
-    scrollback: 10000,
-    tabStopWidth: 8,
-    bellStyle: 'sound',
-  },
-  header: {
-    text: null,
-    background: 'green',
   },
   options: {
     challengeButton: true,
@@ -102,24 +91,17 @@ const configDefault = {
 
 // test if config.json exists, if not provide error message but try to run anyway
 try {
-  if (!fs.existsSync(configPath)) {
-    console.error(
-      `\n\nERROR: Missing config.json for WebSSH2. Current config: ${util.inspect(myConfig)}`
-    );
-    console.error('\n  See config.json.sample for details\n\n');
-  }
-  console.info(`WebSSH2 service reading config from: ${configPath}`);
+  if (!fs.existsSync(configPath)) console.error('ERROR: Missing config.json for ws-ssh.');
+  console.info('ws-ssh service reading config from:', configPath);
   const configFile = readconfig(configPath, { override: true });
   myConfig = merger.mergeObjects([configDefault, configFile]);
-  debugWebSSH2(`\nCurrent config: ${util.inspect(myConfig)}`);
+  debugWebSSH2('Current config:', myConfig);
 } catch (err) {
   myConfig = configDefault;
-  console.error(
-    `\n\nERROR: Missing config.json for WebSSH2. Current config: ${util.inspect(myConfig)}`
-  );
-  console.error('\n  See config.json.sample for details\n\n');
-  console.error(`ERROR:\n\n  ${err}`);
+  console.error('ERROR: Missing config.json for ws-ssh. Current config:', myConfig);
+  console.error('ERROR:', err);
 }
+
 const config = myConfig;
 
 if (process.env.LISTEN) config.listen.ip = process.env.LISTEN;

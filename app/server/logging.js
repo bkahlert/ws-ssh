@@ -5,7 +5,6 @@
 // private
 
 const debug = require('debug');
-const util = require('util');
 
 /**
  * generate consistent prefix for log messages
@@ -17,8 +16,8 @@ function prefix(socket) {
 }
 
 // public
-function webssh2debug(socket, msg) {
-  debug('WebSSH2')(`${prefix(socket)} ${msg}`);
+function webssh2debug(socket, ...msg) {
+  debug('ws-ssh', prefix(socket), ...msg);
 }
 
 /**
@@ -27,7 +26,7 @@ function webssh2debug(socket, msg) {
  * @param {object} msg    log message
  */
 function auditLog(socket, msg) {
-  console.info(`WebSSH2 ${prefix(socket)} AUDIT: ${msg}`);
+  console.info(`ws-ssh ${prefix(socket)} AUDIT: ${msg}`);
 }
 
 /**
@@ -38,8 +37,8 @@ function auditLog(socket, msg) {
  * @param {object} err    error object or error message
  */
 function logError(socket, myFunc, err) {
-  console.error(`WebSSH2 ${prefix(socket)} ERROR: ${myFunc}: ${err}`);
-  webssh2debug(socket, `logError: ${myFunc}: ${util.inspect(err)}`);
+  console.error(`ws-ssh ${prefix(socket)} ERROR: ${myFunc}: ${err}`);
+  webssh2debug(socket, 'logError', myFunc, err);
   if (!socket.request.session) return;
   socket.emit('ssherror', `SSH ${myFunc}: ${err}`);
 }

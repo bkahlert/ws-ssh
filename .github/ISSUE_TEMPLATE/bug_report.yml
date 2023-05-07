@@ -1,9 +1,9 @@
 name: Bug Report
 description: File a bug report
 title: "[Bug]: "
-labels: ["bug", "triage"]
+labels: [ "bug", "triage" ]
 assignees:
-  - billchurch
+  - bkahlert
 body:
   - type: markdown
     attributes:
@@ -20,7 +20,7 @@ body:
       required: true
   - type: input
     id: node_ver
-    attributes: 
+    attributes:
       label: Node Version
       description: version of Node this problem occurs on
       placeholder: npm -v
@@ -28,7 +28,7 @@ body:
       required: true
   - type: input
     id: npm_ver
-    attributes: 
+    attributes:
       label: NPM Version
       description: version of NPM this problem occurs on
       placeholder: npm -v
@@ -36,23 +36,23 @@ body:
       required: true
   - type: input
     id: server_ver
-    attributes: 
+    attributes:
       label: Server OS Version
       description: Server OS Version / Distribution / Processor Architecture
       placeholder: uname -a;cat /etc/os-release
     validations:
       required: true
   - type: input
-    id: webssh2_ver
-    attributes: 
-      label: WebSSH2 release version
-      description: Version of WebSSH you are using 
+    id: ws-ssh_ver
+    attributes:
+      label: ws-ssh release version
+      description: Version of WebSSH you are using
       placeholder: grep version app/package.json
     validations:
       required: true
   - type: input
     id: sshhost_ver
-    attributes: 
+    attributes:
       label: OS and Version of SSH server
       description: OS and Version of SSH server connecting to
       placeholder: 'on target server run: uname -a;sshd -v'
@@ -60,7 +60,7 @@ body:
       required: false
   - type: input
     id: browser_ver
-    attributes: 
+    attributes:
       label: Browser Version
       description: Information from brwoser's About... or a screenshot of the about screen.
       placeholder:
@@ -72,4 +72,3 @@ body:
       label: Relevant log output
       description: Please copy and paste any relevant log output. This will be automatically formatted into code, so no need for backticks.
       render: shell
-

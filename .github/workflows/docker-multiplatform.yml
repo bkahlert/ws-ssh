@@ -3,7 +3,7 @@ name: 'Build Docker Images'
 
 on:
   release:
-    types: [published]
+    types: [ published ]
 
 jobs:
   docker:
@@ -18,7 +18,7 @@ jobs:
 
           # If this is git tag, use the tag name as a docker tag
           if [[ $GITHUB_REF == refs/tags/* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/webssh2-v}
+            VERSION=${GITHUB_REF#refs/tags/ws-ssh-v}
             TAGS="${DOCKER_IMAGE}:${VERSION}"
           fi
           

@@ -10,7 +10,6 @@ const SSH = require('ssh2').Client;
 const CIDRMatcher = require('cidr-matcher');
 const validator = require('validator');
 const dnsPromises = require('dns').promises;
-const util = require('util');
 const { webssh2debug, auditLog, logError } = require('./logging');
 
 /**
@@ -19,12 +18,10 @@ const { webssh2debug, auditLog, logError } = require('./logging');
  * @param {object} err    Error object
  */
 function connError(socket, err) {
-  let msg = util.inspect(err);
+  let msg = err;
   const { session } = socket.request;
   if (err?.level === 'client-authentication') {
     msg = `Authentication failure user=${session.username} from=${socket.handshake.address}`;
-    socket.emit('allowreauth', session.ssh.allowreauth);
-    socket.emit('reauth');
   }
   if (err?.code === 'ENOTFOUND') {
     msg = `Host not found: ${err.hostname}`;
@@ -105,25 +102,15 @@ module.exports = function appSocket(socket) {
       socket.emit('data', data.replace(/\r?\n/g, '\r\n').toString('utf-8'));
     });
 
-    conn.on('handshake', (data => {
-      socket.emit('setTerminalOpts', socket.request.session.ssh.terminal);
-      socket.emit('menu');
-      socket.emit('allowreauth', socket.request.session.ssh.allowreauth);
+    conn.on('handshake', () => {
+      socket.emit('options', socket.request.session.ssh);
       socket.emit('title', `ssh://${socket.request.session.ssh.host}`);
-      if (socket.request.session.ssh.header.background)
-        socket.emit('headerBackground', socket.request.session.ssh.header.background);
-      if (socket.request.session.ssh.header.name)
-        socket.emit('header', socket.request.session.ssh.header.name);
-      socket.emit(
-        'footer',
-        `ssh://${socket.request.session.username}@${socket.request.session.ssh.host}:${socket.request.session.ssh.port}`
-      );
-    }));
+    });
 
     conn.on('ready', () => {
       webssh2debug(
         socket,
-        `CONN READY: LOGIN: user=${socket.request.session.username} from=${socket.handshake.address} host=${socket.request.session.ssh.host} port=${socket.request.session.ssh.port} allowreplay=${socket.request.session.ssh.allowreplay} term=${socket.request.session.ssh.term}`
+        `CONN READY: LOGIN: user=${socket.request.session.username} from=${socket.handshake.address} host=${socket.request.session.ssh.host} port=${socket.request.session.ssh.port} term=${socket.request.session.ssh.term}`
       );
       auditLog(
         socket,
@@ -131,8 +118,6 @@ module.exports = function appSocket(socket) {
       );
       login = true;
       socket.emit('status', 'SSH CONNECTION ESTABLISHED');
-      socket.emit('statusBackground', 'green');
-      socket.emit('allowreplay', socket.request.session.ssh.allowreplay);
       const { term, cols, rows } = socket.request.session.ssh;
       conn.shell({ term, cols, rows }, (err, stream) => {
         if (err) {
@@ -142,30 +127,15 @@ module.exports = function appSocket(socket) {
           return;
         }
         socket.once('disconnect', (reason) => {
-          webssh2debug(socket, `CLIENT SOCKET DISCONNECT: ${util.inspect(reason)}`);
+          webssh2debug(socket, 'CLIENT SOCKET DISCONNECT', reason);
           conn.end();
           socket.request.session.destroy();
         });
         socket.on('error', (errMsg) => {
-          webssh2debug(socket, `SOCKET ERROR: ${errMsg}`);
+          webssh2debug(socket, 'SOCKET ERROR', errMsg);
           logError(socket, 'SOCKET ERROR', errMsg);
           conn.end();
           socket.disconnect(true);
-        });
-        socket.on('control', (controlData) => {
-          if (controlData === 'replayCredentials' && socket.request.session.ssh.allowreplay) {
-            stream.write(`${socket.request.session.userpassword}\n`);
-          }
-          if (controlData === 'reauth' && socket.request.session.username && login === true) {
-            auditLog(
-              socket,
-              `LOGOUT user=${socket.request.session.username} from=${socket.handshake.address} host=${socket.request.session.ssh.host}:${socket.request.session.ssh.port}`
-            );
-            login = false;
-            conn.end();
-            socket.disconnect(true);
-          }
-          webssh2debug(socket, `SOCKET CONTROL: ${controlData}`);
         });
         socket.on('resize', (data) => {
           stream.setWindow(data.rows, data.cols);
@@ -178,7 +148,7 @@ module.exports = function appSocket(socket) {
           socket.emit('data', data.toString('utf-8'));
         });
         stream.on('close', (code, signal) => {
-          webssh2debug(socket, `STREAM CLOSE: ${util.inspect([code, signal])}`);
+          webssh2debug(socket, 'STREAM CLOSE', [code, signal]);
           if (socket.request.session?.username && login === true) {
             auditLog(
               socket,
@@ -187,7 +157,7 @@ module.exports = function appSocket(socket) {
             login = false;
           }
           if (code !== 0 && typeof code !== 'undefined')
-            logError(socket, 'STREAM CLOSE', util.inspect({ message: [code, signal] }));
+            logError(socket, 'STREAM CLOSE', { message: [code, signal] });
           socket.disconnect(true);
           conn.end();
         });
@@ -213,29 +183,44 @@ module.exports = function appSocket(socket) {
       webssh2debug(socket, 'CONN keyboard-interactive');
       finish([socket.request.session.userpassword]);
     });
-    if (
-      socket.request.session.username &&
-      (socket.request.session.userpassword || socket.request.session.privatekey) &&
-      socket.request.session.ssh
-    ) {
-      // console.log('hostkeys: ' + hostkeys[0].[0])
+
+    socket.once('auth', (data) => {
+      webssh2debug(socket, data);
+      if (!socket.request.session.ssh)
+        socket.request.session.ssh = {
+          term: 'xterm-color',
+          cols: 80,
+          rows: 24,
+          readyTimeout: 20000,
+          keepaliveInterval: 120000,
+          keepaliveCountMax: 10,
+        };
+
       const { ssh } = socket.request.session;
-      ssh.username = socket.request.session.username;
-      ssh.password = socket.request.session.userpassword;
-      ssh.tryKeyboard = true;
-      ssh.debug = debug('ssh2');
-      conn.connect(ssh);
-    } else {
-      webssh2debug(
-        socket,
-        `CONN CONNECT: Attempt to connect without session.username/password or session varialbles defined, potentially previously abandoned client session. disconnecting websocket client.\r\nHandshake information: \r\n  ${util.inspect(
+      ssh.host = data.host;
+      ssh.port = data.port || ssh.port;
+      ssh.username = data.username;
+      ssh.password = data.password;
+
+      if (ssh.host && ssh.port && ssh.username && ssh.password) {
+        ssh.cols = data.cols || ssh.cols;
+        ssh.rows = data.rows || ssh.rows;
+        ssh.tryKeyboard = true;
+        ssh.debug = debug('ssh2');
+        conn.connect(ssh);
+      } else {
+        webssh2debug(
+          socket,
+          'CONN CONNECT: Incomplete credentials.\r\nHandshake information:',
           socket.handshake
-        )}`
-      );
-      socket.emit('ssherror', 'WEBSOCKET ERROR - Refresh the browser and try again');
-      socket.request.session.destroy();
-      socket.disconnect(true);
-    }
+        );
+        socket.emit('destination', 'damm damm damm');
+        socket.emit('ssherror', 'WEBSOCKET ERROR - Refresh the browser and try again');
+        socket.request.session.destroy();
+        socket.disconnect(true);
+      }
+    });
   }
+
   setupConnection();
 };

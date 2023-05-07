@@ -20,7 +20,7 @@ jobs:
         with:
           token: ${{ secrets.RELEASE_PLEASE_UAT }}
           command: manifest
-          package-name: webssh2
+          package-name: ws-ssh
           path: app
           default-branch: main
   publish:

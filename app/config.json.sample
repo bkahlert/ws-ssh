@@ -32,12 +32,8 @@
     "bellStyle": "sound",
     "fontSize": 14
   },
-  "header": {
-    "text": null,
-    "background": "green"
-  },
   "session": {
-    "name": "WebSSH2",
+    "name": "ws-ssh",
     "secret": "mysecret"
   },
   "options": {
