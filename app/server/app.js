@@ -50,6 +50,8 @@ app.use(safeShutdownGuard);
 const whitelist = [
   'http://localhost:8080',
   'https://localhost:8080',
+  'https://hello.aws-dev.choam.de',
+  'https://hello.bkahlert.com',
   'https://ssh.de-docker.choam.de',
 ];
 const corsOptions = {
